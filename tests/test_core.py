@@ -64,6 +64,23 @@ class CoreTests(unittest.TestCase):
             self.assertEqual(fig.data[0].increasing.fillcolor, "#ef4444")
             self.assertEqual(fig.data[0].decreasing.fillcolor, "#3b82f6")
 
+    def test_same_market_for_prices_and_flows(self):
+        from unittest.mock import patch
+        class Recorder(KiwoomClient):
+            def __init__(self): self.calls = []
+            def pages(self, api_id, path, body, list_key, start=None):
+                self.calls.append((api_id, body))
+                return []
+        for market, expected in (("통합", "083450_AL"), ("KRX", "083450"), ("NXT", "083450_NX")):
+            client = Recorder()
+            with patch("kiwoom_client.normalize", return_value="ok"):
+                self.assertEqual(client.chart("083450", "20260801", "20260827", market=market), "ok")
+            self.assertEqual([body["stk_cd"] for _, body in client.calls], [expected, expected])
+            self.assertEqual(client.calls[1][1]["amt_qty_tp"], "1")
+            self.assertEqual(client.calls[1][1]["trde_tp"], "0")
+        with self.assertRaises(ApiError):
+            Recorder().chart("083450", "20260801", "20260827", market="unknown")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -88,14 +88,18 @@ class KiwoomClient:
             rows.extend(self.pages("ka10099", "/api/dostk/stkinfo", {"mrkt_tp": market}, "list"))
         return {x["code"]: x["name"] for x in rows if re.fullmatch(r"\d{6}", x.get("code", ""))}
 
-    def chart(self, code, start, end, adjusted=True):
+    def chart(self, code, start, end, adjusted=True, market="통합"):
         if not re.fullmatch(r"\d{6}", code):
             raise ApiError("종목코드는 6자리 숫자로 입력하세요.")
+        suffixes = {"통합": "_AL", "KRX": "", "NXT": "_NX"}
+        if market not in suffixes:
+            raise ApiError("조회 시장은 통합, KRX, NXT 중에서 선택하세요.")
+        market_code = code + suffixes[market]
         price = self.pages("ka10081", "/api/dostk/chart", {
-            "stk_cd": code, "base_dt": end, "upd_stkpc_tp": "1" if adjusted else "0"},
+            "stk_cd": market_code, "base_dt": end, "upd_stkpc_tp": "1" if adjusted else "0"},
             "stk_dt_pole_chart_qry", start)
         flow = self.pages("ka10059", "/api/dostk/stkinfo", {
-            "stk_cd": code, "dt": end, "amt_qty_tp": "1", "trde_tp": "0", "unit_tp": "1"},
+            "stk_cd": market_code, "dt": end, "amt_qty_tp": "1", "trde_tp": "0", "unit_tp": "1"},
             "stk_invsr_orgn", start)
         return normalize(price, flow, start, end)
 

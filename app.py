@@ -36,6 +36,8 @@ with st.sidebar:
     picked = st.selectbox("종목명·코드 검색", list(stocks), format_func=lambda c: f"{stocks[c]} ({c})")
     manual = st.text_input("직접 종목코드 입력 (선택)", placeholder="6자리 숫자")
     code = manual.strip() or picked
+    market = st.selectbox("조회 시장", ["통합", "KRX", "NXT"],
+                          help="영웅문과 같은 시장을 선택하세요. 가격·거래량·수급에 모두 적용됩니다.")
     start = st.date_input("시작일", today - timedelta(days=180), max_value=today)
     end = st.date_input("종료일", today, max_value=today)
     adjusted = st.checkbox("수정주가", value=True)
@@ -50,7 +52,7 @@ with st.sidebar:
     visible_bars = st.number_input("한 화면에 표시할 봉 개수", min_value=10, max_value=500,
                                    value=60, step=10)
 
-requested = (source, code, start.isoformat(), end.isoformat(), adjusted)
+requested = (source, code, start.isoformat(), end.isoformat(), adjusted, market)
 if fetch or ("frame" not in st.session_state and source.startswith("데모")):
     if start > end or not re.fullmatch(r"\d{6}", code):
         st.error("조회기간과 6자리 종목코드를 확인하세요.")
@@ -58,7 +60,7 @@ if fetch or ("frame" not in st.session_state and source.startswith("데모")):
         try:
             with st.spinner("일봉과 투자자별 수급을 조회하고 있습니다…"):
                 df = demo_data(start, end) if source.startswith("데모") else client().chart(
-                    code, start.strftime("%Y%m%d"), end.strftime("%Y%m%d"), adjusted)
+                    code, start.strftime("%Y%m%d"), end.strftime("%Y%m%d"), adjusted, market=market)
                 if df.empty:
                     raise ApiError("선택한 기간에 데이터가 없습니다.")
                 st.session_state.frame = df
@@ -74,12 +76,14 @@ df = st.session_state.frame
 if requested != loaded:
     st.warning("조회 조건이 바뀌었습니다. 아래는 이전 조회 결과입니다. ‘차트 조회’를 눌러 갱신하세요.")
 loaded_source, loaded_code = loaded[:2]
+# Older browser sessions contain KRX-only results with a five-element key.
+loaded_market = loaded[5] if len(loaded) > 5 else "KRX"
 is_demo = loaded_source.startswith("데모")
-title = f"{'가상 예시 · ' if is_demo else ''}{stocks.get(loaded_code, loaded_code)} ({loaded_code})"
+title = f"{'가상 예시 · ' if is_demo else ''}{stocks.get(loaded_code, loaded_code)} ({loaded_code}) · {loaded_market}"
 if is_demo:
     st.info("가상 데이터로 기능을 확인하는 화면입니다. 실제 주가·수급과 관계가 없습니다.")
 else:
-    st.caption("KRX 일봉 · 수급 금액 기준 · 당일 값은 장중·장마감 집계 과정에서 변경될 수 있습니다.")
+    st.caption(f"{loaded_market} 일봉 · 수급 금액 기준 · 당일 값은 장중·장마감 집계 과정에서 변경될 수 있습니다.")
 missing = int(df[["personal", "foreign", "institution"]].isna().any(axis=1).sum())
 if missing:
     st.warning(f"{missing}거래일에 수급 일부 또는 전체가 미제공되어 해당 주체의 신호를 생략했습니다.")
@@ -110,7 +114,8 @@ st.caption("순매수한 날짜의 봉 뒤에 연한 세로 띠를 표시합니�
 with st.expander("일별 수급 표 / CSV 다운로드"):
     table = df.copy()
     table["date"] = table.date.dt.strftime("%Y-%m-%d")
+    table.insert(1, "market", loaded_market)
     st.dataframe(table, width="stretch", hide_index=True)
     st.caption("personal·foreign·institution·trading_value: 원, *_pct: %. 미제공 값은 빈칸입니다.")
     st.download_button("CSV 다운로드", table.to_csv(index=False).encode("utf-8-sig"),
-                       f"{'demo_' if is_demo else ''}{loaded_code}_investor_chart.csv", "text/csv")
+                       f"{'demo_' if is_demo else ''}{loaded_code}_{loaded_market}_investor_chart.csv", "text/csv")

@@ -80,7 +80,7 @@ def figure(df, title, investors, threshold=0, percent=False, lines=(), averages=
             for xref, yref in (("x", "y domain"), ("x2", "y2 domain")):
                 fig.add_shape(type="line", xref=xref, yref=yref,
                     x0=index - 0.5, x1=index - 0.5, y0=0, y1=1,
-                    line={"color": "#94a3b8", "width": 1, "dash": "dot"},
+                    line={"color": "#94a3b8", "width": 1, "dash": "solid"},
                     layer="above", name=f"월 구분 {months[index]}")
     for price in lines:
         fig.add_hline(y=price, line_dash="dash", line_color="#64748b",

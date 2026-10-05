@@ -4,9 +4,9 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 INVESTORS = {
-    "개인": ("personal", "triangle-up", "#f59e0b"),
-    "외국인": ("foreign", "circle", "#14b8a6"),
-    "기관": ("institution", "diamond", "#a78bfa"),
+    "개인": ("personal", "square", "#f472b6"),
+    "외국인": ("foreign", "square", "#2dd4bf"),
+    "기관": ("institution", "square", "#a78bfa"),
 }
 
 
@@ -55,15 +55,23 @@ def figure(df, title, investors, threshold=0, percent=False, lines=(), averages=
         marker={"size": 10, "color": "rgba(255,255,255,0.01)"},
         text=tooltip, hovertemplate="%{text}<extra></extra>", showlegend=False), row=1, col=1)
     gap = max(float(visible.high.max() - visible.low.min()) * 0.025, float(visible.close.median()) * 0.008)
-    for idx, (label, (who, symbol, color)) in enumerate(INVESTORS.items()):
-        if label not in investors:
-            continue
-        mask = (df[who] > 0) & ((df[who+"_pct"] >= threshold) if percent else True)
-        fig.add_trace(go.Scatter(x=[d for d, ok in zip(x, mask) if ok],
-            y=df.loc[mask, "low"] - gap * (idx + 1), mode="markers",
-            marker={"symbol": symbol, "size": 10, "color": color}, name=f"{label} 순매수",
-            text=[t for t, ok in zip(tooltip, mask) if ok],
-            hovertemplate="%{text}<extra></extra>"), row=1, col=1)
+    selected = {label: config for label, config in INVESTORS.items() if label in investors}
+    for label, (_, symbol, color) in selected.items():
+        fig.add_trace(go.Scatter(x=[None], y=[None], mode="markers",
+            marker={"symbol": symbol, "size": 12, "color": color},
+            name=f"{label} 순매수 배경", hoverinfo="skip"), row=1, col=1)
+    for index, (_, record) in enumerate(df.iterrows()):
+        buyers = [(label, color) for label, (who, _, color) in selected.items()
+                  if record[who] > 0 and (not percent or record[who + "_pct"] >= threshold)]
+        # Category-axis coordinates use the candle's zero-based index.
+        # Split the day's width so simultaneous buyers remain distinguishable.
+        for part, (label, color) in enumerate(buyers):
+            width = 0.9 / len(buyers)
+            left = index - 0.45 + part * width
+            fig.add_shape(type="rect", xref="x", yref="y domain",
+                x0=left, x1=left + width, y0=0, y1=1,
+                fillcolor=color, opacity=0.18, line={"width": 0},
+                layer="below", name=f"{label} 순매수")
     for price in lines:
         fig.add_hline(y=price, line_dash="dash", line_color="#64748b",
                       annotation_text=f"{price:,.0f}원", row=1, col=1)
@@ -72,14 +80,14 @@ def figure(df, title, investors, threshold=0, percent=False, lines=(), averages=
         hovertemplate="%{x}<br>거래량 %{y:,.0f}주<extra></extra>"), row=2, col=1)
     fig.update_layout(title=title, height=800, template="plotly_white", dragmode="pan",
                       margin={"l": 30, "r": 60, "t": 70, "b": 30},
-                      legend={"orientation": "h", "y": 1.04}, hovermode="closest",
+                      legend={"orientation": "h", "y": 1.04, "itemclick": False, "itemdoubleclick": False}, hovermode="closest",
                       xaxis_rangeslider_visible=False,
                       uirevision=f"{title}:{len(df)}:{start}:{count}")
     fig.update_xaxes(type="category", categoryorder="array", categoryarray=x,
                       nticks=12, showgrid=False, range=[start - 0.5, start + count - 0.5])
     # Scale to the selected window so off-screen historical extremes do not
-    # compress the candles. Leave enough space for the three signal rows.
-    bottom, top = float(visible.low.min()) - gap * 4, float(visible.high.max()) + gap * 2
+    # compress the candles.
+    bottom, top = float(visible.low.min()) - gap * 2, float(visible.high.max()) + gap * 2
     fig.update_yaxes(title_text="가격 (원)", side="right", range=[bottom, top], row=1, col=1)
     fig.update_yaxes(title_text="거래량 (주)", side="right", range=[0, max(1, float(visible.volume.max()) * 1.1)], row=2, col=1)
     return fig

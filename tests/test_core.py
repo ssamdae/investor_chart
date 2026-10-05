@@ -27,14 +27,19 @@ class CoreTests(unittest.TestCase):
         d = normalize(self.price, self.flow, "20260901", "20260930")
         self.assertTrue(pd.isna(d.personal_pct.iloc[0]))
 
-    def test_markers_and_line_scope(self):
+    def test_bands_and_line_scope(self):
         d = normalize(self.price, self.flow, "20260901", "20260930")
         fig = figure(d, "test", ["개인", "외국인", "기관"], lines=[20000])
-        self.assertEqual(fig.layout.shapes[0].yref, "y")
-        self.assertEqual(len(next(t for t in fig.data if t.name == "개인 순매수").x), 1)
-        self.assertEqual(len(next(t for t in fig.data if t.name == "외국인 순매수").x), 0)
+        self.assertEqual(next(s for s in fig.layout.shapes if s.type == "line").yref, "y")
+        bands = [s for s in fig.layout.shapes if s.type == "rect"]
+        self.assertEqual(len(bands), 2)
+        self.assertEqual([s.name for s in bands], ["개인 순매수", "기관 순매수"])
+        self.assertEqual(bands[0].x1, bands[1].x0)
+        self.assertEqual(bands[0].x0, -0.45)
+        self.assertEqual(bands[1].x1, 0.45)
+        self.assertTrue(all(s.yref == "y domain" and s.y0 == 0 and s.y1 == 1 and s.layer == "below" for s in bands))
         fig = figure(d, "test", ["개인"], threshold=5, percent=True)
-        self.assertEqual(len(next(t for t in fig.data if t.name == "개인 순매수").x), 0)
+        self.assertFalse(any(s.type == "rect" for s in fig.layout.shapes))
 
     def test_pagination_headers_and_stop(self):
         class Fake(KiwoomClient):
@@ -49,16 +54,15 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(client.calls[1]["next-key"], "next")
         self.assertEqual(client.calls[1]["cont-yn"], "Y")
 
-    def test_fixed_window_and_below_candle_signals(self):
+    def test_fixed_window_with_background_bands(self):
         d = demo_data("20260101", "20260401")
         for start in (0, len(d) - 20):
             fig = figure(d, "test", ["개인", "외국인", "기관"], visible_bars=20, window_start=start)
             self.assertEqual(tuple(fig.layout.xaxis.range), (start - 0.5, start + 19.5))
             self.assertEqual(fig.layout.xaxis.range, fig.layout.xaxis2.range)
-            lows = dict(zip(d.date.dt.strftime("%Y-%m-%d"), d.low))
-            for trace in fig.data:
-                if trace.name and "순매수" in trace.name:
-                    self.assertTrue(all(y < lows[x] for x, y in zip(trace.x, trace.y)))
+            self.assertTrue(all(s.yref == "y domain" for s in fig.layout.shapes))
+            self.assertEqual(fig.data[0].increasing.fillcolor, "#ef4444")
+            self.assertEqual(fig.data[0].decreasing.fillcolor, "#3b82f6")
 
 
 if __name__ == "__main__":

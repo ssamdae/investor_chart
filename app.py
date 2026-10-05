@@ -83,7 +83,7 @@ else:
 missing = int(df[["personal", "foreign", "institution"]].isna().any(axis=1).sum())
 if missing:
     st.warning(f"{missing}거래일에 수급 일부 또는 전체가 미제공되어 해당 주체의 신호를 생략했습니다.")
-st.caption(f"표시기간 {df.date.min():%Y-%m-%d} ~ {df.date.max():%Y-%m-%d} · {len(df)}거래일 · 개인 ▲ / 외국인 ● / 기관 ◆")
+st.caption(f"표시기간 {df.date.min():%Y-%m-%d} ~ {df.date.max():%Y-%m-%d} · {len(df)}거래일 · 순매수 배경: 개인 분홍 / 외국인 민트 / 기관 보라")
 
 line_key = f"lines_{loaded_code}"
 st.session_state.setdefault(line_key, [])
@@ -121,7 +121,7 @@ fig = figure(df, title, actors, threshold, percent, st.session_state[line_key], 
              visible_bars=count, window_start=window_start)
 st.plotly_chart(fig, width="stretch", config={"scrollZoom": True, "displaylogo": False,
     "modeBarButtonsToAdd": ["drawline", "eraseshape"]})
-st.caption("가로 이동 슬라이더로 봉 개수를 유지하며 이동할 수 있습니다. 차트 드래그: 이동 · 휠: 확대/축소. 순매수 기호는 봉 아래에 표시됩니다. 마커 또는 종가 위치에 마우스를 올리면 세 주체의 수급을 확인할 수 있습니다. 수평선은 이 브라우저 세션에서 종목별로 유지됩니다.")
+st.caption("순매수한 날짜의 봉 뒤에 연한 세로 띠를 표시합니다. 여러 주체가 순매수하면 개인·외국인·기관 순서로 띠를 좌우 분할합니다. 표시 주체는 사이드바에서 선택하세요. 종가 위치에 마우스를 올리면 세 주체의 수급을 확인할 수 있습니다. 가로 이동 슬라이더로 봉 개수를 유지하며 이동할 수 있습니다.")
 with st.expander("일별 수급 표 / CSV 다운로드"):
     table = df.copy()
     table["date"] = table.date.dt.strftime("%Y-%m-%d")

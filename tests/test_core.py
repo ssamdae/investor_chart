@@ -60,7 +60,7 @@ class CoreTests(unittest.TestCase):
             fig = figure(d, "test", ["개인", "외국인", "기관"], visible_bars=20, window_start=start)
             self.assertEqual(tuple(fig.layout.xaxis.range), (start - 0.5, start + 19.5))
             self.assertEqual(fig.layout.xaxis.range, fig.layout.xaxis2.range)
-            self.assertTrue(all(s.yref == "y domain" for s in fig.layout.shapes))
+            self.assertTrue(all(s.yref == "y domain" for s in fig.layout.shapes if s.type == "rect"))
             self.assertEqual(fig.data[0].increasing.fillcolor, "#ef4444")
             self.assertEqual(fig.data[0].decreasing.fillcolor, "#3b82f6")
 

@@ -34,7 +34,7 @@ def figure(df, title, investors, threshold=0, percent=False, lines=(), averages=
     start = max(0, min(len(df) - count, window_start if window_start is not None else len(df) - count))
     visible = df.iloc[start:start + count]
     fig = make_subplots(rows=2, cols=1, shared_xaxes=True,
-                        row_heights=[0.78, 0.22], vertical_spacing=0.04)
+                        row_heights=[0.78, 0.22], vertical_spacing=0.09)
     x = df.date.dt.strftime("%Y-%m-%d").tolist()
     fig.add_trace(go.Candlestick(x=x, open=df.open, high=df.high, low=df.low, close=df.close,
         increasing_line_color="#ef4444", increasing_fillcolor="#ef4444",
@@ -95,6 +95,20 @@ def figure(df, title, investors, threshold=0, percent=False, lines=(), averages=
                       uirevision=f"{title}:{len(df)}:{start}:{count}")
     fig.update_xaxes(type="category", categoryorder="array", categoryarray=x,
                       nticks=12, showgrid=False, range=[start - 0.5, start + count - 0.5])
+    # Use the price chart's bottom axis as the price/volume divider.
+    # Keep month starts and thin the other dates at wider candle scales.
+    step = max(1, int(np.ceil(count / 12)))
+    month_starts = {i for i in range(len(months)) if i == 0 or months[i] != months[i - 1]}
+    tick_indices = sorted(month_starts | {
+        i for i in range(0, len(df), step)
+        if all(abs(i - boundary) >= max(1, step / 2) for boundary in month_starts)
+    })
+    tick_labels = [f"{df.date.iloc[i].month}월<br>{df.date.iloc[i].day:02d}일" for i in tick_indices]
+    fig.update_xaxes(showline=True, linecolor="#64748b", linewidth=1,
+        side="bottom", showticklabels=True, ticks="outside", ticklen=4,
+        tickmode="array", tickvals=[x[i] for i in tick_indices], ticktext=tick_labels,
+        tickfont={"size": 10}, tickangle=0, automargin=True, row=1, col=1)
+    fig.update_xaxes(showticklabels=False, ticks="", row=2, col=1)
     # Scale to the selected window so off-screen historical extremes do not
     # compress the candles.
     bottom, top = float(visible.low.min()) - gap * 2, float(visible.high.max()) + gap * 2

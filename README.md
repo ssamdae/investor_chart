@@ -52,27 +52,61 @@ streamlit run app.py --server.address 127.0.0.1 --server.port 49299
 
 현재 사용 중인 서버 포트 49299를 예시로 사용합니다. 사용 중이면 빈 포트로 바꾸고 SSH 터널의 원격 포트도 맞춰주세요. 이 프로세스는 터미널을 닫으면 종료됩니다.
 
-## 맥에서 서버 화면 보기
+## 상시 실행 설정 (최초 1회)
 
-맥의 별도 터미널에서 SSH 터널을 열고 유지합니다. 키 파일이 있는 폴더에서 실행하세요.
+Ubuntu 사용자 `ubuntu`, 설치 경로 `/home/ubuntu/apps/investor_chart`, 포트 `49299` 기준 systemd 서비스 파일을 제공합니다. 다른 경로라면 서비스 파일의 User, Group, WorkingDirectory, ExecStart를 먼저 수정하세요.
 
-```bash
-ssh -i main_server.key -L 8504:127.0.0.1:49299 ubuntu@134.185.103.144
-```
-
-맥 브라우저에서 http://localhost:8504 를 엽니다. 외부 포트 개방은 필요 없습니다.
-
-## 이후 업데이트 받기
-
-서버에서 다음 명령으로 수정본을 받고, 실행 중인 Streamlit은 Ctrl+C로 종료한 뒤 다시 실행하세요. `.env`는 Git에서 제외되므로 키 설정은 유지됩니다.
+기존에 직접 실행한 Streamlit 터미널에서 Ctrl+C로 종료한 다음 서버에서 실행합니다. 다른 앱의 프로세스는 종료하지 마세요.
 
 ```bash
 cd /home/ubuntu/apps/investor_chart
 git pull --ff-only
-source .venv/bin/activate
-pip install -r requirements.txt
-streamlit run app.py --server.address 127.0.0.1 --server.port 49299
+.venv/bin/python -m pip install -r requirements.txt
+sudo install -m 644 deploy/investor-chart.service /etc/systemd/system/investor-chart.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now investor-chart
+sudo systemctl status investor-chart --no-pager
+curl --fail http://127.0.0.1:49299/_stcore/health
 ```
+
+상태가 `active (running)`이고 상태 확인 응답이 `ok`이면 실행된 것입니다. 시작 직후 응답이 없으면 잠시 뒤 상태 확인을 다시 실행하세요. SSH를 끊어도 앱이 실행되며, 서버가 재부팅되면 자동 시작하고 앱 프로세스가 종료되면 10초 후 재시작합니다. Oracle 서버 자체는 켜져 있어야 합니다. API 키는 기존 `.env`를 앱이 읽으며 서비스 파일에 복사하지 않습니다.
+
+로그와 관리 명령:
+
+```bash
+sudo journalctl -u investor-chart -n 50 --no-pager
+sudo systemctl restart investor-chart
+# 의도적으로 중지 (자동 재시작하지 않음)
+sudo systemctl stop investor-chart
+# 자동 시작 해제 및 중지
+sudo systemctl disable --now investor-chart
+```
+
+포트 사용 중 오류가 나면 기존에 수동 실행한 앱이 남아 있는지 확인하세요. 서비스와 수동 실행을 동시에 사용하지 마세요.
+
+## 맥에서 서버 화면 보기
+
+앱 상시 실행과 맥의 접속 터널은 별개입니다. 아래 명령은 서버 앱을 켜는 명령이 아니라 접속 통로를 여는 명령입니다. 맥 터미널에서 키 파일이 있는 폴더에서 실행하고 유지하세요.
+
+```bash
+ssh -N -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -i main_server.key -L 8504:127.0.0.1:49299 ubuntu@134.185.103.144
+```
+
+맥 브라우저에서 http://localhost:8504 를 엽니다. 연결 후 터미널에 아무 출력이 없어도 정상입니다. 맥을 재시작하거나 터널이 끊기면 이 명령만 다시 실행하면 됩니다. 서버에 로그인해 Streamlit을 다시 실행할 필요는 없습니다. 외부 포트 개방은 필요 없습니다.
+
+## 이후 업데이트 받기
+
+서비스 설치 후 서버에서 다음 명령으로 업데이트합니다. `.env`는 Git에서 제외되므로 키 설정은 유지됩니다.
+
+```bash
+cd /home/ubuntu/apps/investor_chart
+git pull --ff-only
+.venv/bin/python -m pip install -r requirements.txt
+sudo systemctl restart investor-chart
+sudo systemctl status investor-chart --no-pager
+```
+
+서비스 파일 자체가 변경된 경우에는 최초 설정의 `sudo install`과 `sudo systemctl daemon-reload`도 다시 실행한 뒤 재시작하세요.
 
 ## 사용 순서
 
@@ -112,7 +146,7 @@ Python 실행 및 Streamlit 데모 UI, 순매수 마커, 가격 차트의 수평
 python -m unittest discover -s tests -v
 ```
 
-사용자 서버에서 실데이터 조회 및 GST 2026-08-27 개인 KRX 순매수 +285백만원을 영웅문과 대조했습니다. 통합시장 조회는 업데이트 후 같은 날짜의 -87백만원과 대조해야 합니다. 최초 실데이터 연결 시 GST(083450)의 최근 완료된 거래일을 HTS와 대조해 개인·외국인·기관 금액 및 거래량을 확인하세요. 동일한 시장·금액 단위·조회일·집계시점을 맞춰 비교해야 합니다.
+사용자 서버에서 실데이터 조회 및 GST 2026-08-27 개인 KRX 순매수 +285백만원을 영웅문과 대조했습니다. 통합시장 조회도 같은 날짜의 -87백만원과 일치함을 사용자가 확인했습니다. 최초 실데이터 연결 시 GST(083450)의 최근 완료된 거래일을 HTS와 대조해 개인·외국인·기관 금액 및 거래량을 확인하세요. 동일한 시장·금액 단위·조회일·집계시점을 맞춰 비교해야 합니다.
 
 연결 실패 시 먼저 `.env` 키, 실전/모의 키 구분, 서버 접속 IP, REST API 서비스 등록을 확인하세요. 응답을 임의로 예시 데이터로 바꾸지 않습니다.
 

@@ -1,0 +1,4 @@
+# Import this file into an EXISTING Caddy configuration; do not overwrite other sites.
+investor-api.134-185-103-144.sslip.io {
+    reverse_proxy 127.0.0.1:49300
+}

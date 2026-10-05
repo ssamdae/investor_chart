@@ -19,6 +19,12 @@
 
 지지대 자동 판별이나 기준봉 조건은 적용하지 않습니다. 일별 수급은 하루 전체의 순매수이며 특정 가격에서 매수된 물량을 의미하지 않습니다.
 
+## 어디서든 접속하는 Streamlit Cloud 배포
+
+화면은 Streamlit Cloud, 키움 조회는 Oracle 서버에서 실행할 수 있습니다.
+[서버 API·HTTPS·Cloud 설정 안내](deploy/STREAMLIT_CLOUD.md)를 따라 설정하세요.
+기존 Oracle 단독 실행도 그대로 지원합니다.
+
 ## Ubuntu 설치
 
 서버에 접속한 뒤 GitHub에서 코드를 받아 실행하세요.
@@ -143,6 +149,7 @@ sudo systemctl status investor-chart --no-pager
 Python 실행 및 Streamlit 데모 UI, 순매수 마커, 가격 차트의 수평선, 금액 변환·음수 부호·수급 누락·연속조회 로직을 검증했습니다. 테스트는 다음 명령으로 재실행할 수 있습니다.
 
 ```bash
+python -m pip install -r requirements-server.txt httpx
 python -m unittest discover -s tests -v
 ```
 

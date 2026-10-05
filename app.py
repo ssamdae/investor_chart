@@ -3,12 +3,15 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 import os
 import re
+import hmac
+import time
 
 import streamlit as st
 from dotenv import load_dotenv
 
 from chart import INVESTORS, demo_data, figure
 from kiwoom_client import ApiError, KiwoomClient
+from remote_client import RemoteClient
 
 load_dotenv(Path(__file__).with_name(".env"))
 st.set_page_config(page_title="투자주체 수급 차트", layout="wide")
@@ -17,9 +20,44 @@ st.caption("수평선으로 가격대를 살펴보고, 같은 날 순매수한 �
 today = datetime.now(ZoneInfo("Asia/Seoul")).date()
 
 
+def setting(name):
+    value = os.getenv(name)
+    if value is not None:
+        return value
+    try:
+        return str(st.secrets.get(name, ""))
+    except FileNotFoundError:
+        return ""
+
+
+remote_url = setting("DATA_API_URL")
+if remote_url:
+    password = setting("CLOUD_APP_PASSWORD")
+    if len(password) < 12:
+        st.error("Cloud Secrets에 12자 이상의 CLOUD_APP_PASSWORD를 설정하세요.")
+        st.stop()
+    if not st.session_state.get("cloud_authenticated"):
+        with st.form("login"):
+            entered = st.text_input("접속 비밀번호", type="password")
+            submitted = st.form_submit_button("로그인")
+        if submitted:
+            if hmac.compare_digest(entered.encode(), password.encode()):
+                st.session_state.cloud_authenticated = True
+                st.rerun()
+            else:
+                time.sleep(1)
+                st.error("비밀번호가 맞지 않습니다.")
+        st.stop()
+    if st.sidebar.button("로그아웃"):
+        st.session_state.clear()
+        st.rerun()
+
+
 def client():
     if "client" not in st.session_state:
-        st.session_state.client = KiwoomClient(os.getenv("KIWOOM_APP_KEY"), os.getenv("KIWOOM_SECRET_KEY"))
+        st.session_state.client = (
+            RemoteClient(remote_url, setting("DATA_API_TOKEN")) if remote_url else
+            KiwoomClient(setting("KIWOOM_APP_KEY"), setting("KIWOOM_SECRET_KEY")))
     return st.session_state.client
 
 

@@ -47,6 +47,8 @@ with st.sidebar:
     threshold = st.number_input("순매수 비율 이상 (%)", min_value=0.0, max_value=100.0,
                                 value=5.0, step=1.0, disabled=not percent)
     averages = st.multiselect("이동평균선", [5, 20, 60, 120, 224], default=[])
+    visible_bars = st.number_input("한 화면에 표시할 봉 개수", min_value=10, max_value=500,
+                                   value=60, step=10)
 
 requested = (source, code, start.isoformat(), end.isoformat(), adjusted)
 if fetch or ("frame" not in st.session_state and source.startswith("데모")):
@@ -98,10 +100,28 @@ with c3:
         st.session_state[line_key] = [p for p in st.session_state[line_key] if p not in remove]
         st.rerun()
 
-fig = figure(df, title, actors, threshold, percent, st.session_state[line_key], averages)
+count = min(int(visible_bars), len(df))
+max_start = len(df) - count
+navigation_key = f"window_{loaded}_{count}"
+if max_start > 0:
+    st.session_state.setdefault(navigation_key, max_start)
+    def latest_window():
+        st.session_state[navigation_key] = max_start
+    nav, latest = st.columns([6, 1])
+    with nav:
+        window_start = st.slider("가로 이동 (왼쪽: 과거 / 오른쪽: 최근)",
+            min_value=0, max_value=max_start, step=1, key=navigation_key,
+            format="%d", help="표시할 봉 개수를 유지하며 시작 위치를 한 거래일씩 이동합니다.")
+    with latest:
+        st.button("최근으로", on_click=latest_window)
+else:
+    window_start = 0
+st.caption(f"현재 화면: {df.date.iloc[window_start]:%Y-%m-%d} ~ {df.date.iloc[window_start + count - 1]:%Y-%m-%d} · {count}개 봉")
+fig = figure(df, title, actors, threshold, percent, st.session_state[line_key], averages,
+             visible_bars=count, window_start=window_start)
 st.plotly_chart(fig, width="stretch", config={"scrollZoom": True, "displaylogo": False,
     "modeBarButtonsToAdd": ["drawline", "eraseshape"]})
-st.caption("드래그: 이동 · 휠: 확대/축소 · 더블클릭: 원래 보기. 마커 또는 종가 위치에 마우스를 올리면 세 주체의 순매수·순매도를 확인할 수 있습니다. 수평선은 이 브라우저 세션에서 종목별로 유지됩니다.")
+st.caption("가로 이동 슬라이더로 봉 개수를 유지하며 이동할 수 있습니다. 차트 드래그: 이동 · 휠: 확대/축소. 순매수 기호는 봉 아래에 표시됩니다. 마커 또는 종가 위치에 마우스를 올리면 세 주체의 수급을 확인할 수 있습니다. 수평선은 이 브라우저 세션에서 종목별로 유지됩니다.")
 with st.expander("일별 수급 표 / CSV 다운로드"):
     table = df.copy()
     table["date"] = table.date.dt.strftime("%Y-%m-%d")

@@ -28,7 +28,11 @@ def demo_data(start, end):
     return df
 
 
-def figure(df, title, investors, threshold=0, percent=False, lines=(), averages=()):
+def figure(df, title, investors, threshold=0, percent=False, lines=(), averages=(),
+           visible_bars=None, window_start=None):
+    count = min(len(df), visible_bars or len(df))
+    start = max(0, min(len(df) - count, window_start if window_start is not None else len(df) - count))
+    visible = df.iloc[start:start + count]
     fig = make_subplots(rows=2, cols=1, shared_xaxes=True,
                         row_heights=[0.78, 0.22], vertical_spacing=0.04)
     x = df.date.dt.strftime("%Y-%m-%d").tolist()
@@ -49,13 +53,13 @@ def figure(df, title, investors, threshold=0, percent=False, lines=(), averages=
     fig.add_trace(go.Scatter(x=x, y=df.close, mode="markers",
         marker={"size": 10, "color": "rgba(255,255,255,0.01)"},
         text=tooltip, hovertemplate="%{text}<extra></extra>", showlegend=False), row=1, col=1)
-    gap = max(float(df.high.max() - df.low.min()) * 0.025, float(df.close.median()) * 0.008)
+    gap = max(float(visible.high.max() - visible.low.min()) * 0.025, float(visible.close.median()) * 0.008)
     for idx, (label, (who, symbol, color)) in enumerate(INVESTORS.items()):
         if label not in investors:
             continue
         mask = (df[who] > 0) & ((df[who+"_pct"] >= threshold) if percent else True)
         fig.add_trace(go.Scatter(x=[d for d, ok in zip(x, mask) if ok],
-            y=df.loc[mask, "high"] + gap * (idx + 1), mode="markers",
+            y=df.loc[mask, "low"] - gap * (idx + 1), mode="markers",
             marker={"symbol": symbol, "size": 10, "color": color}, name=f"{label} 순매수",
             text=[t for t, ok in zip(tooltip, mask) if ok],
             hovertemplate="%{text}<extra></extra>"), row=1, col=1)
@@ -68,9 +72,13 @@ def figure(df, title, investors, threshold=0, percent=False, lines=(), averages=
     fig.update_layout(title=title, height=800, template="plotly_white", dragmode="pan",
                       margin={"l": 30, "r": 60, "t": 70, "b": 30},
                       legend={"orientation": "h", "y": 1.04}, hovermode="closest",
-                      xaxis_rangeslider_visible=False)
+                      xaxis_rangeslider_visible=False,
+                      uirevision=f"{title}:{len(df)}:{start}:{count}")
     fig.update_xaxes(type="category", categoryorder="array", categoryarray=x,
-                      nticks=12, showgrid=False)
-    fig.update_yaxes(title_text="가격 (원)", side="right", row=1, col=1)
-    fig.update_yaxes(title_text="거래량 (주)", side="right", rangemode="tozero", row=2, col=1)
+                      nticks=12, showgrid=False, range=[start - 0.5, start + count - 0.5])
+    # Scale to the selected window so off-screen historical extremes do not
+    # compress the candles. Leave enough space for the three signal rows.
+    bottom, top = float(visible.low.min()) - gap * 4, float(visible.high.max()) + gap * 2
+    fig.update_yaxes(title_text="가격 (원)", side="right", range=[bottom, top], row=1, col=1)
+    fig.update_yaxes(title_text="거래량 (주)", side="right", range=[0, max(1, float(visible.volume.max()) * 1.1)], row=2, col=1)
     return fig

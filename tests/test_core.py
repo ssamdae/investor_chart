@@ -1,6 +1,6 @@
 import unittest
 import pandas as pd
-from chart import figure
+from chart import figure, demo_data
 from kiwoom_client import normalize, number, KiwoomClient, ApiError
 
 
@@ -48,6 +48,17 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(len(client.pages("id", "path", {}, "rows", "20260901")), 2)
         self.assertEqual(client.calls[1]["next-key"], "next")
         self.assertEqual(client.calls[1]["cont-yn"], "Y")
+
+    def test_fixed_window_and_below_candle_signals(self):
+        d = demo_data("20260101", "20260401")
+        for start in (0, len(d) - 20):
+            fig = figure(d, "test", ["개인", "외국인", "기관"], visible_bars=20, window_start=start)
+            self.assertEqual(tuple(fig.layout.xaxis.range), (start - 0.5, start + 19.5))
+            self.assertEqual(fig.layout.xaxis.range, fig.layout.xaxis2.range)
+            lows = dict(zip(d.date.dt.strftime("%Y-%m-%d"), d.low))
+            for trace in fig.data:
+                if trace.name and "순매수" in trace.name:
+                    self.assertTrue(all(y < lows[x] for x, y in zip(trace.x, trace.y)))
 
 
 if __name__ == "__main__":

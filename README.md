@@ -7,7 +7,9 @@
 - 종목명·코드 선택, 코스피·코스닥 목록 조회, 6자리 코드 직접 입력
 - 기간 선택, 수정주가 선택
 - 캔들 아래 거래량 표시: 양봉 빨강, 음봉 파랑
-- 순매수 주체: 개인 ▲(주황), 외국인 ●(청록), 기관 ◆(보라)
+- 순매수 주체를 봉 아래에 표시: 개인 ▲(주황), 외국인 ●(청록), 기관 ◆(보라)
+- 한 화면 봉 개수 설정(기본 60개), 가로 이동 슬라이더, 최근으로 버튼
+- 가로 이동 시 봉 개수를 유지하고 해당 구간에 맞춰 가격·거래량 축 조정
 - 순매수 > 0 또는 거래대금 대비 순매수 비율 임계값 선택
 - 같은 날 두 주체 이상 순매수하면 겹치지 않도록 높이를 달리 표시
 - 마커/종가 위치에 마우스를 올려 세 주체의 순매수·순매도 금액과 비율 확인
@@ -45,20 +47,20 @@ KIWOOM_SECRET_KEY=발급받은_시크릿키
 API 키가 아직 없어도 바로 데모 실행이 가능합니다.
 
 ```bash
-streamlit run app.py --server.address 127.0.0.1 --server.port 8502
+streamlit run app.py --server.address 127.0.0.1 --server.port 49299
 ```
 
-기존 Streamlit 앱과 충돌하지 않도록 8502 포트를 사용합니다. 이 프로세스는 터미널을 닫으면 종료됩니다.
+현재 사용 중인 서버 포트 49299를 예시로 사용합니다. 사용 중이면 빈 포트로 바꾸고 SSH 터널의 원격 포트도 맞춰주세요. 이 프로세스는 터미널을 닫으면 종료됩니다.
 
 ## 맥에서 서버 화면 보기
 
 맥의 별도 터미널에서 SSH 터널을 열고 유지합니다. 키 파일이 있는 폴더에서 실행하세요.
 
 ```bash
-ssh -i main_server.key -L 8502:127.0.0.1:8502 ubuntu@134.185.103.144
+ssh -i main_server.key -L 8504:127.0.0.1:49299 ubuntu@134.185.103.144
 ```
 
-맥 브라우저에서 http://localhost:8502 를 엽니다. 외부 포트 개방은 필요 없습니다.
+맥 브라우저에서 http://localhost:8504 를 엽니다. 외부 포트 개방은 필요 없습니다.
 
 ## 이후 업데이트 받기
 
@@ -69,7 +71,7 @@ cd /home/ubuntu/apps/investor_chart
 git pull --ff-only
 source .venv/bin/activate
 pip install -r requirements.txt
-streamlit run app.py --server.address 127.0.0.1 --server.port 8502
+streamlit run app.py --server.address 127.0.0.1 --server.port 49299
 ```
 
 ## 사용 순서

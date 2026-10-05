@@ -37,7 +37,8 @@ def figure(df, title, investors, threshold=0, percent=False, lines=(), averages=
                         row_heights=[0.78, 0.22], vertical_spacing=0.04)
     x = df.date.dt.strftime("%Y-%m-%d").tolist()
     fig.add_trace(go.Candlestick(x=x, open=df.open, high=df.high, low=df.low, close=df.close,
-        increasing_line_color="#ef4444", decreasing_line_color="#3b82f6", name="일봉",
+        increasing_line_color="#ef4444", increasing_fillcolor="#ef4444",
+        decreasing_line_color="#3b82f6", decreasing_fillcolor="#3b82f6", name="일봉",
         hoverinfo="skip"), row=1, col=1)
     for period in averages:
         fig.add_trace(go.Scatter(x=x, y=df.close.rolling(period).mean(), mode="lines",

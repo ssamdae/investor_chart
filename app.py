@@ -101,27 +101,12 @@ with c3:
         st.rerun()
 
 count = min(int(visible_bars), len(df))
-max_start = len(df) - count
-navigation_key = f"window_{loaded}_{count}"
-if max_start > 0:
-    st.session_state.setdefault(navigation_key, max_start)
-    def latest_window():
-        st.session_state[navigation_key] = max_start
-    nav, latest = st.columns([6, 1])
-    with nav:
-        window_start = st.slider("가로 이동 (왼쪽: 과거 / 오른쪽: 최근)",
-            min_value=0, max_value=max_start, step=1, key=navigation_key,
-            format="%d", help="표시할 봉 개수를 유지하며 시작 위치를 한 거래일씩 이동합니다.")
-    with latest:
-        st.button("최근으로", on_click=latest_window)
-else:
-    window_start = 0
-st.caption(f"현재 화면: {df.date.iloc[window_start]:%Y-%m-%d} ~ {df.date.iloc[window_start + count - 1]:%Y-%m-%d} · {count}개 봉")
+window_start = len(df) - count
 fig = figure(df, title, actors, threshold, percent, st.session_state[line_key], averages,
              visible_bars=count, window_start=window_start)
 st.plotly_chart(fig, width="stretch", config={"scrollZoom": True, "displaylogo": False,
     "modeBarButtonsToAdd": ["drawline", "eraseshape"]})
-st.caption("순매수한 날짜의 봉 뒤에 연한 세로 띠를 표시합니다. 여러 주체가 순매수하면 개인·외국인·기관 순서로 띠를 좌우 분할합니다. 표시 주체는 사이드바에서 선택하세요. 종가 위치에 마우스를 올리면 세 주체의 수급을 확인할 수 있습니다. 가로 이동 슬라이더로 봉 개수를 유지하며 이동할 수 있습니다.")
+st.caption("순매수한 날짜의 봉 뒤에 연한 세로 띠를 표시합니다. 여러 주체가 순매수하면 개인·외국인·기관 순서로 띠를 좌우 분할합니다. 표시 주체는 사이드바에서 선택하세요. 종가 위치에 마우스를 올리면 세 주체의 수급을 확인할 수 있습니다. 차트를 드래그하면 과거·최근 구간으로 이동할 수 있습니다.")
 with st.expander("일별 수급 표 / CSV 다운로드"):
     table = df.copy()
     table["date"] = table.date.dt.strftime("%Y-%m-%d")

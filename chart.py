@@ -72,6 +72,16 @@ def figure(df, title, investors, threshold=0, percent=False, lines=(), averages=
                 x0=left, x1=left + width, y0=0, y1=1,
                 fillcolor=color, opacity=0.18, line={"width": 0},
                 layer="below", name=f"{label} 순매수")
+    # Put month boundaries between adjacent trading-day candles, including
+    # December/January and months whose first trading day is after the first.
+    months = df.date.dt.to_period("M").tolist()
+    for index in range(1, len(months)):
+        if months[index] != months[index - 1]:
+            for xref, yref in (("x", "y domain"), ("x2", "y2 domain")):
+                fig.add_shape(type="line", xref=xref, yref=yref,
+                    x0=index - 0.5, x1=index - 0.5, y0=0, y1=1,
+                    line={"color": "#94a3b8", "width": 1, "dash": "dot"},
+                    layer="above", name=f"월 구분 {months[index]}")
     for price in lines:
         fig.add_hline(y=price, line_dash="dash", line_color="#64748b",
                       annotation_text=f"{price:,.0f}원", row=1, col=1)

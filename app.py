@@ -14,7 +14,7 @@ from kiwoom_client import ApiError, KiwoomClient
 from remote_client import RemoteClient
 
 load_dotenv(Path(__file__).with_name(".env"))
-st.set_page_config(page_title="투자주체 수급 차트", layout="wide")
+st.set_page_config(page_title="chart", layout="wide")
 st.title("투자주체 수급 차트")
 st.caption("수평선으로 가격대를 살펴보고, 같은 날 순매수한 주체를 확인하세요.")
 today = datetime.now(ZoneInfo("Asia/Seoul")).date()

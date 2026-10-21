@@ -52,3 +52,17 @@ echo "[2/2] 키움 일봉·투자주체 순매수 분석: 날짜=$ASOF, 시장=$
 "$PYTHON_BIN" -m research.support_pool --pool "$POOL" --asof "$ASOF" \
   --market "$MARKET" --limit "$LIMIT" --output "$OUT"
 echo "완료: $ROOT/$OUT"
+"$PYTHON_BIN" - "$OUT" <<'PY'
+import sys
+import pandas as pd
+frame = pd.read_csv(sys.argv[1], dtype={"stock_code": str})
+view = [c for c in (
+    "stock_name", "support_type", "support_distance_pct",
+    "score", "signal_level", "reason"
+) if c in frame.columns]
+if not frame.empty:
+    print("\n[관찰 결과 상위 10건 — 연구용/실제 매수신호 아님]")
+    print(frame[view].head(10).to_string(index=False))
+else:
+    print("후보 풀에 분석 가능한 종목이 없습니다.")
+PY

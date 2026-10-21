@@ -234,6 +234,7 @@ def main():
     ap.add_argument("--sheet", help="Defaults to 우선검토40, otherwise 1차필터결과")
     ap.add_argument("--asof", required=True, help="Snapshot and completed session date YYYYMMDD")
     ap.add_argument("--market", default="KRX", choices=["KRX", "통합", "NXT"])
+    ap.add_argument("--validate-only", action="store_true", help="Validate stage-1 snapshot; do not call Kiwoom")
     ap.add_argument("--price-dir", type=Path, help="Offline code.csv files instead of live Kiwoom")
     ap.add_argument("--start", help="Historical lookup start YYYYMMDD; default asof - 120 calendar days")
     ap.add_argument("--limit", type=int, help="Fetch at most N rows for a small trial")
@@ -248,6 +249,18 @@ def main():
             ap.error("--limit must be positive")
         pool = read_support_pool(args.pool, args.sheet)
         validate_snapshot_date(pool, args.asof)
+        if args.validate_only:
+            cols = [c for c in ("stock_code", "stock_name", "support_type", "support_price",
+                                "support_distance_pct", "stage1_rank") if c in pool]
+            print(json.dumps({
+                "status": "VALIDATED_WITHOUT_API",
+                "asof": args.asof,
+                "pool_size": len(pool),
+                "with_support_price": int(pool["support_price"].notna().sum()),
+                "support_types": pool["support_type"].value_counts(dropna=False).to_dict(),
+                "sample": pool[cols].head(5).where(pd.notna(pool[cols]), None).to_dict(orient="records"),
+            }, indent=2, ensure_ascii=False, default=str))
+            return
         if args.price_dir:
             def get_frame(code):
                 return pd.read_csv(args.price_dir / f"{code}.csv")

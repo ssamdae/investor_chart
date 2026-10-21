@@ -12,6 +12,7 @@ on:
       - "tests/test_real_support_schema.py"
       - "tests/test_backtest_support.py"
       - ".github/workflows/research-tests.yml"
+      - "scripts/run_pre500_trial.sh"
 
 jobs:
   offline:
@@ -27,6 +28,8 @@ jobs:
         run: python -m pip install "pandas>=2.2,<3" "numpy>=1.26,<3" "openpyxl>=3.1,<4"
       - name: Syntax check
         run: python -m compileall -q research tests/test_pre500.py tests/test_support_pool.py
+      - name: Validate pilot shell script
+        run: bash -n scripts/run_pre500_trial.sh
       - name: Run offline research unit tests
         run: |
           python -m unittest discover -s tests -p 'test_pre500.py' -v

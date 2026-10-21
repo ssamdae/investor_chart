@@ -66,6 +66,15 @@ class ActualWorkbookSchemaTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "snapshot date"):
                 validate_snapshot_date(pool, "20261009")
 
+    def test_sheet_auto_detects_customized_support_sheet(self):
+        with tempfile.TemporaryDirectory() as t:
+            path = Path(t) / "선취매_지지수급_20261008.xlsx"
+            with pd.ExcelWriter(path) as w:
+                pd.DataFrame({"구분": ["기타"]}).to_excel(w, sheet_name="메타", index=False)
+                actual_header_rows().to_excel(w, sheet_name="검토대상40", index=False)
+            selected = read_support_pool(path)
+            self.assertEqual(selected["stock_code"].tolist(), ["010120", "058610"])
+
     def test_validate_only_cli_reads_real_schema_without_kiwoom(self):
         with tempfile.TemporaryDirectory() as t:
             path = Path(t) / "선취매_지지수급_20261008.xlsx"

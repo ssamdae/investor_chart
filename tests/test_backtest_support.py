@@ -22,7 +22,7 @@ class ReplayTests(unittest.TestCase):
     def test_d1_open_entry_and_5day_labels(self):
         x = days()
         asof = x.at[30, "date"].strftime("%Y%m%d")
-        x.loc[31, ["open", "high", "low", "close"]] = [105, 110, 101, 109]
+        x.loc[31, ["open", "high", "low", "close"]] = [105, 111, 101, 109]
         x.loc[34, ["open", "high", "low", "close"]] = [100, 120, 90, 115]
         r = future_outcomes(x, asof)
         self.assertEqual([a["horizon"] for a in r], [1, 3, 5])

@@ -75,7 +75,10 @@ def score_stock(frame: pd.DataFrame, asof: str, pool_row: dict) -> dict:
     """Evaluate available signals as of YYYYMMDD. No future labels are used."""
     dt = pd.to_datetime(asof, format="%Y%m%d", errors="raise")
     x = frame.copy()
-    x["date"] = pd.to_datetime(x["date"], errors="raise")
+    # CSV readers may infer YYYYMMDD as integer: do not parse it as epoch nanoseconds.
+    raw_date = x["date"].astype(str).str.strip().str.replace(r"\\.0$", "", regex=True)
+    compact = pd.to_datetime(raw_date, format="%Y%m%d", errors="coerce")
+    x["date"] = compact if compact.notna().all() else pd.to_datetime(x["date"], errors="raise")
     x = x.loc[x["date"] <= dt]
     base = {"stock_code": pool_row["stock_code"], "stock_name": pool_row["stock_name"],
             "snapshot_date": asof, "support_type": pool_row.get("support_type", "")}

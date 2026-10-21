@@ -10,6 +10,7 @@ on:
       - "tests/test_pre500.py"
       - "tests/test_support_pool.py"
       - "tests/test_real_support_schema.py"
+      - "tests/test_backtest_support.py"
       - ".github/workflows/research-tests.yml"
 
 jobs:
@@ -31,3 +32,4 @@ jobs:
           python -m unittest discover -s tests -p 'test_pre500.py' -v
           python -m unittest discover -s tests -p 'test_support_pool.py' -v
           python -m unittest discover -s tests -p 'test_real_support_schema.py' -v
+          python -m unittest discover -s tests -p 'test_backtest_support.py' -v

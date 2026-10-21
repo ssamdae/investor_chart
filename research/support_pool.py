@@ -40,7 +40,19 @@ def read_support_pool(path: Path, sheet: str | None = None) -> pd.DataFrame:
         if sheet is None:
             sheet = next((x for x in ("우선검토40", "1차필터결과") if x in xl.sheet_names), None)
             if sheet is None:
-                raise ValueError(f"Unknown sheet names: {xl.sheet_names}; pass --sheet")
+                # Some support workbooks use customized sheet labels. Detect
+                # candidate sheets by the actual columns instead of guessing.
+                candidates = []
+                for name in xl.sheet_names:
+                    columns = set(pd.read_excel(xl, sheet_name=name, nrows=0).columns)
+                    if "종목코드" in columns and (
+                        {"최인접지지", "최인접지지가격"}.issubset(columns)
+                        or "최우선지지선" in columns
+                    ):
+                        candidates.append(name)
+                if not candidates:
+                    raise ValueError(f"No compatible support candidate sheet found among {xl.sheet_names}")
+                sheet = next((name for name in candidates if "우선" in name or "검토" in name), candidates[0])
         pool = pd.read_excel(xl, sheet_name=sheet, dtype=object)
     elif path.suffix.lower() == ".csv":
         pool = pd.read_csv(path, dtype=object, encoding="utf-8-sig")

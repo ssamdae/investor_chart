@@ -1,0 +1,29 @@
+name: Research unit tests
+
+on:
+  push:
+    branches:
+      - "research/**"
+  pull_request:
+    paths:
+      - "research/**"
+      - "tests/test_pre500.py"
+      - "tests/test_support_pool.py"
+      - ".github/workflows/research-tests.yml"
+
+jobs:
+  offline:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install research test dependencies (no secrets needed)
+        run: python -m pip install "pandas>=2.2,<3" "numpy>=1.26,<3" "openpyxl>=3.1,<4"
+      - name: Syntax check
+        run: python -m compileall -q research tests/test_pre500.py tests/test_support_pool.py
+      - name: Run offline research unit tests
+        run: python -m unittest tests.test_pre500 tests.test_support_pool -v

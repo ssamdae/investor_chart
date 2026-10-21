@@ -151,8 +151,8 @@ def score_stock(frame: pd.DataFrame, asof: str, pool_row: dict) -> dict:
         dist = float(dist) if dist is not None and pd.notna(dist) else None
 
     recent = x.tail(11).copy()
-    up = recent.loc[recent["close"].diff().tail(10).gt(0), "trading_value"].dropna()
-    down = recent.loc[recent["close"].diff().tail(10).lt(0), "trading_value"].dropna()
+    up = recent.loc[recent["close"].diff().gt(0), "trading_value"].dropna()
+    down = recent.loc[recent["close"].diff().lt(0), "trading_value"].dropna()
     ratio = (float(up.mean() / down.mean()) if len(up) >= 2 and len(down) >= 2
              and down.mean() > 0 and recent["trading_value"].notna().all() else None)
 

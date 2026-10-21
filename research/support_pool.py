@@ -87,7 +87,7 @@ def read_support_pool(path: Path, sheet: str | None = None) -> pd.DataFrame:
     if "stage1_rank" in out:
         out["stage1_rank"] = pd.to_numeric(out["stage1_rank"], errors="coerce")
         out = out.sort_values("stage1_rank", na_position="last", kind="stable")
-    if out["support_price"].isna().all() and out["support_distance_pct"].isna().all():
+    if (out["support_price"].isna() & out["support_distance_pct"].isna()).any():
         raise ValueError("Stage-1 support price/distance missing: verify the input sheet and columns")
     if out["stock_code"].duplicated().any():
         raise ValueError("Duplicate stock codes in snapshot")

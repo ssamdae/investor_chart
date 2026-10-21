@@ -6,10 +6,14 @@ not its market data; these tests do not produce trading conclusions.
 from pathlib import Path
 import tempfile
 import unittest
+import io
+import json
+from contextlib import redirect_stdout
+from unittest.mock import patch
 
 import pandas as pd
 
-from research.support_pool import read_support_pool, validate_snapshot_date, scan
+from research.support_pool import read_support_pool, validate_snapshot_date, scan, main
 
 
 def actual_header_rows():
@@ -61,6 +65,20 @@ class ActualWorkbookSchemaTests(unittest.TestCase):
             validate_snapshot_date(pool, "20261008")
             with self.assertRaisesRegex(ValueError, "snapshot date"):
                 validate_snapshot_date(pool, "20261009")
+
+    def test_validate_only_cli_reads_real_schema_without_kiwoom(self):
+        with tempfile.TemporaryDirectory() as t:
+            path = Path(t) / "선취매_지지수급_20261008.xlsx"
+            with pd.ExcelWriter(path) as w:
+                actual_header_rows().to_excel(w, sheet_name="우선검토40", index=False)
+            output = io.StringIO()
+            with patch("sys.argv", ["support_pool", "--pool", str(path),
+                                    "--asof", "20261008", "--validate-only"]), redirect_stdout(output):
+                main()
+            result = json.loads(output.getvalue())
+            self.assertEqual(result["status"], "VALIDATED_WITHOUT_API")
+            self.assertEqual(result["pool_size"], 2)
+            self.assertEqual(result["with_support_price"], 2)
 
     def test_missing_support_fields_fail_instead_of_silent_guess(self):
         with tempfile.TemporaryDirectory() as t:

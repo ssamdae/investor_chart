@@ -50,12 +50,20 @@ def read_support_pool(path: Path, sheet: str | None = None) -> pd.DataFrame:
     if code_col is None:
         raise ValueError("Missing stock code column: 종목코드 / stock_code")
     name_col = _col(pool.columns, ("종목", "종목명", "stock_name"))
-    type_col = _col(pool.columns, ("최우선지지선", "지지선", "support_type"))
-    support_col = _col(pool.columns, ("support_price", "지지점가격", "지지선가격", "지지가격"))
-    dist_col = _col(pool.columns, ("support_distance_pct", "지지점이격도(%)", "최우선이격도(%)"))
+    type_col = _col(pool.columns, ("최인접지지", "최우선지지선", "지지선", "support_type"))
+    support_col = _col(pool.columns, ("최인접지지가격", "support_price", "지지점가격", "지지선가격", "지지가격"))
+    dist_col = _col(pool.columns, ("최인접이격도(%)", "support_distance_pct", "지지점이격도(%)", "최우선이격도(%)"))
     date_col = _col(pool.columns, ("기준일", "snapshot_date"))
 
-    out = pd.DataFrame()
+    # The existing screener owns the stage-1 decisions. Do not reconstruct its
+    # moving-average/V-low support logic or extend the pool with other stocks.
+    if "우선검토군" in pool.columns:
+        flag = pool["우선검토군"].fillna("").astype(str).str.upper().str.strip()
+        pool = pool.loc[flag.isin(("Y", "YES", "TRUE", "1"))].copy()
+    if pool.empty:
+        raise ValueError("Stage-1 support pool has no eligible rows")
+    pool = pool.reset_index(drop=True)
+    out = pd.DataFrame(index=pool.index)
     out["stock_code"] = pool[code_col].map(_code)
     out["stock_name"] = (pool[name_col].fillna("").astype(str) if name_col else "")
     out["support_type"] = pool[type_col].fillna("").astype(str) if type_col else ""
@@ -63,12 +71,43 @@ def read_support_pool(path: Path, sheet: str | None = None) -> pd.DataFrame:
                             if support_col else pd.Series(float("nan"), index=pool.index))
     out["support_distance_pct"] = (pd.to_numeric(pool[dist_col], errors="coerce")
                                    if dist_col else pd.Series(float("nan"), index=pool.index))
-    out["source_row_date"] = (pool[date_col].astype(str) if date_col else "")
+    out["source_row_date"] = (pool[date_col].astype(str).str.strip() if date_col else "")
+    # Retain the stage-1 context for interpretable stage-2 ranking.
+    for src, dst in (
+        ("우선검토순위", "stage1_rank"),
+        ("우선검토점수", "stage1_score"),
+        ("검토등급", "stage1_grade"),
+        ("대표테마", "theme"),
+        ("접촉지지", "support_contacts"),
+        ("지지개수", "support_count"),
+        ("시장", "market"),
+    ):
+        if src in pool:
+            out[dst] = pool[src].values
+    if "stage1_rank" in out:
+        out["stage1_rank"] = pd.to_numeric(out["stage1_rank"], errors="coerce")
+        out = out.sort_values("stage1_rank", na_position="last", kind="stable")
+    if out["support_price"].isna().all() and out["support_distance_pct"].isna().all():
+        raise ValueError("Stage-1 support price/distance missing: verify the input sheet and columns")
     if out["stock_code"].duplicated().any():
         raise ValueError("Duplicate stock codes in snapshot")
+    if out["source_row_date"].ne("").any():
+        dates = pd.to_datetime(out["source_row_date"], errors="coerce")
+        if dates.isna().any() or dates.dt.normalize().nunique() != 1:
+            raise ValueError("Snapshot contains invalid or mixed trade dates")
+        out["source_row_date"] = dates.dt.strftime("%Y%m%d")
     if (out["support_price"].dropna() <= 0).any():
         raise ValueError("Invalid non-positive support price")
     return out.reset_index(drop=True)
+
+
+def validate_snapshot_date(pool: pd.DataFrame, asof: str) -> None:
+    """Reject attempts to use a later/earlier stage-1 file at this as-of date."""
+    target = pd.to_datetime(asof, format="%Y%m%d", errors="raise")
+    if "source_row_date" in pool and pool["source_row_date"].astype(str).ne("").any():
+        observed = pd.to_datetime(pool["source_row_date"], format="%Y%m%d", errors="raise")
+        if observed.dt.normalize().ne(target).any():
+            raise ValueError("Stage-1 snapshot date does not match --asof; using it would bias the analysis")
 
 
 def score_stock(frame: pd.DataFrame, asof: str, pool_row: dict) -> dict:
@@ -81,7 +120,15 @@ def score_stock(frame: pd.DataFrame, asof: str, pool_row: dict) -> dict:
     x["date"] = compact if compact.notna().all() else pd.to_datetime(x["date"], errors="raise")
     x = x.loc[x["date"] <= dt]
     base = {"stock_code": pool_row["stock_code"], "stock_name": pool_row["stock_name"],
-            "snapshot_date": asof, "support_type": pool_row.get("support_type", "")}
+            "snapshot_date": asof, "support_type": pool_row.get("support_type", ""),
+            "support_price": pool_row.get("support_price"),
+            "stage1_rank": pool_row.get("stage1_rank"),
+            "stage1_score": pool_row.get("stage1_score"),
+            "stage1_grade": pool_row.get("stage1_grade"),
+            "theme": pool_row.get("theme"),
+            "support_count": pool_row.get("support_count"),
+            "support_contacts": pool_row.get("support_contacts"),
+            "market": pool_row.get("market")}
     if x.empty or x["date"].max() != dt:
         return {**base, "status": "MISSING_ASOF_PRICE", "score": None,
                 "signal_level": "데이터확인", "reason": "기준일 일봉 없음"}
@@ -103,9 +150,9 @@ def score_stock(frame: pd.DataFrame, asof: str, pool_row: dict) -> dict:
         dist = pool_row.get("support_distance_pct")
         dist = float(dist) if dist is not None and pd.notna(dist) else None
 
-    recent = x.tail(10).copy()
-    up = recent.loc[recent["close"].diff().gt(0), "trading_value"].dropna()
-    down = recent.loc[recent["close"].diff().lt(0), "trading_value"].dropna()
+    recent = x.tail(11).copy()
+    up = recent.loc[recent["close"].diff().tail(10).gt(0), "trading_value"].dropna()
+    down = recent.loc[recent["close"].diff().tail(10).lt(0), "trading_value"].dropna()
     ratio = (float(up.mean() / down.mean()) if len(up) >= 2 and len(down) >= 2
              and down.mean() > 0 and recent["trading_value"].notna().all() else None)
 
@@ -200,6 +247,7 @@ def main():
         if args.limit is not None and args.limit < 1:
             ap.error("--limit must be positive")
         pool = read_support_pool(args.pool, args.sheet)
+        validate_snapshot_date(pool, args.asof)
         if args.price_dir:
             def get_frame(code):
                 return pd.read_csv(args.price_dir / f"{code}.csv")

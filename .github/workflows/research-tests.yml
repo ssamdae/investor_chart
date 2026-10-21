@@ -26,4 +26,6 @@ jobs:
       - name: Syntax check
         run: python -m compileall -q research tests/test_pre500.py tests/test_support_pool.py
       - name: Run offline research unit tests
-        run: python -m unittest tests.test_pre500 tests.test_support_pool -v
+        run: |
+          python -m unittest discover -s tests -p 'test_pre500.py' -v
+          python -m unittest discover -s tests -p 'test_support_pool.py' -v
